@@ -1,46 +1,50 @@
-from flask import Flask, request, send_from_directory, render_template, redirect, url_for
+from fastapi import FastAPI, File, UploadFile, Form, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+import shutil
 import os
 import subprocess
 
-app = Flask(__name__)
+app = FastAPI()
+
 UPLOAD_FOLDER = 'static/uploads'
-PROCESSED_IMAGE = 'static/output.png'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+PROCESSED_IMAGE = 'static/output_image.png'
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        # Get names
-        name1 = request.form.get('name1')
-        name2 = request.form.get('name2')
-        name3 = request.form.get('name3')
-        
-        # Get image
-        if 'image' not in request.files:
-            return redirect(request.url)
-        
-        image_file = request.files['image']
-        if image_file.filename == '':
-            return redirect(request.url)
-        
-        # Save image
-        image_path = os.path.join(app.config['UPLOAD_FOLDER'], 'uploaded_image.png')
-        image_file.save(image_path)
-        
-        # Process image with two Python scripts
-        subprocess.run(['python', 'process_image_1.py'])
-        subprocess.run(['python', 'process_image_2.py', name1,name2,name3])
-        
-        return redirect(url_for('download_file'))
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.post("/")
+async def upload_file(
+    request: Request,
+    name1: str = Form(...),
+    name2: str = Form(...),
+    name3: str = Form(...),
+    image: UploadFile = File(...)
+):
+    # Save image
+    image_path = os.path.join(UPLOAD_FOLDER, 'uploaded_image.png')
+    with open(image_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
     
-    return render_template('index.html')
+    # Process image with two Python scripts
+    subprocess.run(['python', 'process_image_1.py'])
+    subprocess.run(['python', 'process_image_2.py', name1, name2, name3])
+    
+    return RedirectResponse(url="/download", status_code=303)
 
-@app.route('/download')
-def download_file():
-    return send_from_directory(directory='static', path='output_image.png', as_attachment=True)
+@app.get("/download")
+async def download_file():
+    return FileResponse(PROCESSED_IMAGE, media_type='application/octet-stream', filename='output_image.png')
 
 if __name__ == '__main__':
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
-    port = int(os.environ.get('PORT', 0))  # Use PORT environment variable if set, otherwise 0 to select an available port
-    app.run(host='0.0.0.0', port=port, debug=True)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
