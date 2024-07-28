@@ -26,8 +26,10 @@ def main():
 
     # Example usage:
     image_path = 'output.png'    # Path to the input image
+    image = Image.open(image_path)
+    width, height = image.size
     texts = [name1,name2,name3]  # List of texts to be written on the image
-    positions = [(200, 620), (290, 703), (260, 750)]    # List of positions to place the texts (x, y)
+    positions = [(width/2-200, 620), (290, 703), (260, 750)]    # List of positions to place the texts (x, y)
     font_paths = ['Staatliches.ttf', 'Staatliches.ttf', 'Staatliches.ttf']  # List of paths to the .ttf font files
     font_sizes = [75, 46, 35]  # List of font sizes for each text
     colors = ['rgb(255, 251, 254)', 'rgb(255, 251, 254)', 'rgb(255, 199, 46)']  # List of colors for the texts
